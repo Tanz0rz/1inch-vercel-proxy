@@ -40,8 +40,8 @@ export default async function handler(req, res) {
       });
     }    
 
-    // Build the target URL
-    const targetUrl = `https://api.1inch.dev/${path}`;
+    // Build the target URL, removing any leading slash from path to prevent double slashes
+    const targetUrl = `https://api.1inch.dev/${path.replace(/^\//, "")}`;
     debug.targetUrl = targetUrl;
 
     // Prepare headers
