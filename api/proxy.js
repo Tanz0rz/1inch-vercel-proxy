@@ -1,14 +1,16 @@
 export default async function handler(req, res) {
   
-    // Allow only http://localhost:* and http://127.0.0.1:* to call this route
+    // Allow only http://localhost:* to call this route
   const origin = req.headers.origin || '';
-  const isLocalhost = /^https?:\/\/(?:localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  const isLocalhost = /^https?:\/\/localhost(:\d+)?$/i.test(origin);
 
-  // Always set the CORS headers so the browser knows the policy
-  res.setHeader('Access-Control-Allow-Origin', isLocalhost ? origin : 'null');
+  // Only set the CORS header if origin is allowed
+  if (isLocalhost) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Short-circuit pre-flight
   if (req.method === 'OPTIONS') {
