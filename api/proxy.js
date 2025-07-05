@@ -48,9 +48,20 @@ export default async function handler(req, res) {
     const headers = new Headers();
     headers.set("Authorization", `Bearer ${API_AUTH_TOKEN}`);
 
-    // Copy client headers, excluding host
+    // Only forward essential headers
+    const allowedHeaders = [
+      "accept",
+      "accept-encoding",
+      "accept-language",
+      "content-type",
+      "authorization",
+      "user-agent"
+    ];
     for (let [key, value] of Object.entries(req.headers)) {
-      if (key.toLowerCase() !== "host") {
+      if (
+        key.toLowerCase() !== "host" &&
+        allowedHeaders.includes(key.toLowerCase())
+      ) {
         headers.set(key, value);
       }
     }
@@ -64,28 +75,24 @@ export default async function handler(req, res) {
     });
     debug.responseStatus = response.status;
 
-    // Always log the raw response body for debugging
+    // Remove rawResponseBody from debug
     const text = await response.text();
-    debug.rawResponseBody = text;
 
     // If the response code is anything other than a 200, check if there is a response body before parsing it.
     if (response.status !== 200) {
       const contentLength = response.headers.get("content-length");
       debug.non200ContentLength = contentLength;
       if (!contentLength || parseInt(contentLength, 10) === 0) {
-        // If there is no content in a non-200 response, return this
         return res.status(response.status).json({ error: "No content returned", debug });
       }
     }
 
-    // Parse response body and return it to the caller
     let data;
     try {
       data = JSON.parse(text);
     } catch (jsonErr) {
       debug.jsonParseError = jsonErr.message;
-      debug.upstreamNonJsonBody = text;
-      return res.status(500).json({ error: "Invalid JSON from upstream", raw: text, debug });
+      return res.status(500).json({ error: "Invalid JSON from upstream", debug });
     }
     return res.status(response.status).json({ ...data, debug });
   } catch (error) {
