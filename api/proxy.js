@@ -23,23 +23,26 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "API_AUTH_TOKEN is missing from env" });
   }
 
+  const debug = {};
+
   try {
     // Remove the leading "/api/" from req.url
     // e.g. "/api/foo/bar" -> "foo/bar"
     const path = req.url.replace(/^\/api\//, '');
-    console.error("Proxy path:", path); // changed to error
+    debug.proxyPath = path;
 
     if (!path || path === "/" || path === "") {
-      console.error("Proxy root path hit, returning error."); // changed to error
+      debug.error = "Proxy root path hit, returning error.";
       return res.status(400).json({
         error:
           "This is just the root path of the proxy! It doesn't do anything on its own. You need to append the path of the 1inch API you want to talk to",
+        debug,
       });
     }    
 
     // Build the target URL
     const targetUrl = `https://api.1inch.dev/${path}`;
-    console.error("Target URL:", targetUrl); // changed to error
+    debug.targetUrl = targetUrl;
 
     // Prepare headers
     const headers = new Headers();
@@ -51,7 +54,7 @@ export default async function handler(req, res) {
         headers.set(key, value);
       }
     }
-    console.error("Request headers:", Object.fromEntries(headers.entries())); // changed to error
+    debug.requestHeaders = Object.fromEntries(headers.entries());
 
     // Make the proxied request
     const response = await fetch(targetUrl, {
@@ -59,19 +62,19 @@ export default async function handler(req, res) {
       headers,
       body: req.method !== "GET" ? JSON.stringify(req.body) : undefined,
     });
-    console.error("Response status:", response.status); // changed to error
+    debug.responseStatus = response.status;
 
     // Always log the raw response body for debugging
     const text = await response.text();
-    console.error("Raw response body:", text); // changed to error
+    debug.rawResponseBody = text;
 
     // If the response code is anything other than a 200, check if there is a response body before parsing it.
     if (response.status !== 200) {
       const contentLength = response.headers.get("content-length");
-      console.error("Non-200 response, content-length:", contentLength); // changed to error
+      debug.non200ContentLength = contentLength;
       if (!contentLength || parseInt(contentLength, 10) === 0) {
         // If there is no content in a non-200 response, return this
-        return res.status(response.status).json({ error: "No content returned" });
+        return res.status(response.status).json({ error: "No content returned", debug });
       }
     }
 
@@ -80,13 +83,13 @@ export default async function handler(req, res) {
     try {
       data = JSON.parse(text);
     } catch (jsonErr) {
-      console.error("JSON parse error:", jsonErr); // changed to error
-      console.error("Upstream returned non-JSON body:", text); // extra context
-      return res.status(500).json({ error: "Invalid JSON from upstream", raw: text });
+      debug.jsonParseError = jsonErr.message;
+      debug.upstreamNonJsonBody = text;
+      return res.status(500).json({ error: "Invalid JSON from upstream", raw: text, debug });
     }
-    return res.status(response.status).json(data);
+    return res.status(response.status).json({ ...data, debug });
   } catch (error) {
-    console.error("Error forwarding request:", error);
-    return res.status(500).json({ error: "Internal Server Error" });
+    debug.forwardingError = error.message;
+    return res.status(500).json({ error: "Internal Server Error", debug });
   }
 }
