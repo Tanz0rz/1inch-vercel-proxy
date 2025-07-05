@@ -1,4 +1,20 @@
 export default async function handler(req, res) {
+  
+    // Allow only http://localhost:* and http://127.0.0.1:* to call this route
+  const origin = req.headers.origin || '';
+  const isLocalhost = /^https?:\/\/(?:localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+
+  // Always set the CORS headers so the browser knows the policy
+  res.setHeader('Access-Control-Allow-Origin', isLocalhost ? origin : 'null');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  // Short-circuit pre-flight
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   const { API_AUTH_TOKEN } = process.env;
 
   if (!API_AUTH_TOKEN) {
