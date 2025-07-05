@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  
+
     // Allow only http://localhost:* to call this route
   const origin = req.headers.origin || '';
   const isLocalhost = /^https?:\/\/localhost(:\d+)?$/i.test(origin);
@@ -27,8 +27,10 @@ export default async function handler(req, res) {
     // Remove the leading "/api/" from req.url
     // e.g. "/api/foo/bar" -> "foo/bar"
     const path = req.url.replace(/^\/api\//, '');
+    console.log("Proxy path:", path);
 
     if (!path || path === "/" || path === "") {
+      console.log("Proxy root path hit, returning error.");
       return res.status(400).json({
         error:
           "This is just the root path of the proxy! It doesn't do anything on its own. You need to append the path of the 1inch API you want to talk to",
@@ -37,6 +39,7 @@ export default async function handler(req, res) {
 
     // Build the target URL
     const targetUrl = `https://api.1inch.dev/${path}`;
+    console.log("Target URL:", targetUrl);
 
     // Prepare headers
     const headers = new Headers();
@@ -48,6 +51,7 @@ export default async function handler(req, res) {
         headers.set(key, value);
       }
     }
+    console.log("Request headers:", Object.fromEntries(headers.entries()));
 
     // Make the proxied request
     const response = await fetch(targetUrl, {
@@ -55,21 +59,32 @@ export default async function handler(req, res) {
       headers,
       body: req.method !== "GET" ? JSON.stringify(req.body) : undefined,
     });
-    
+    console.log("Response status:", response.status);
+
     // If the response code is anything other than a 200, check if there is a response body before parsing it. 
     // content-length is not reliable using this proxy, so we only check it when the requests errors.
     if (response.status !== 200) {
       const contentLength = response.headers.get("content-length");
+      console.log("Non-200 response, content-length:", contentLength);
       if (!contentLength || parseInt(contentLength, 10) === 0) {
         // If there is no content in a non-200 response, return this
         return res.status(response.status).json({ error: "No content returned" });
       }
     }
-    
+
     // Parse response body and return it to the caller
-    const data = await response.json();
+    const text = await response.text();
+    console.log("Raw response body:", text);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (jsonErr) {
+      console.error("JSON parse error:", jsonErr);
+      return res.status(500).json({ error: "Invalid JSON from upstream", raw: text });
+    }
     return res.status(response.status).json(data);
   } catch (error) {
+    
     console.error("Error forwarding request:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
