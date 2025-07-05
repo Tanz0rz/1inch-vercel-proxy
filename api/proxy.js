@@ -97,6 +97,6 @@ export default async function handler(req, res) {
     return res.status(response.status).json({ ...data, debug });
   } catch (error) {
     debug.forwardingError = error.message;
-    return res.status(500).json({ error: "Internal Server Error", debug });
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 }
