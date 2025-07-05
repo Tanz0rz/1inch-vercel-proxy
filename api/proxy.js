@@ -27,10 +27,10 @@ export default async function handler(req, res) {
     // Remove the leading "/api/" from req.url
     // e.g. "/api/foo/bar" -> "foo/bar"
     const path = req.url.replace(/^\/api\//, '');
-    console.warn("Proxy path:", path);
+    console.error("Proxy path:", path); // changed to error
 
     if (!path || path === "/" || path === "") {
-      console.warn("Proxy root path hit, returning error.");
+      console.error("Proxy root path hit, returning error."); // changed to error
       return res.status(400).json({
         error:
           "This is just the root path of the proxy! It doesn't do anything on its own. You need to append the path of the 1inch API you want to talk to",
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
     // Build the target URL
     const targetUrl = `https://api.1inch.dev/${path}`;
-    console.warn("Target URL:", targetUrl);
+    console.error("Target URL:", targetUrl); // changed to error
 
     // Prepare headers
     const headers = new Headers();
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
         headers.set(key, value);
       }
     }
-    console.warn("Request headers:", Object.fromEntries(headers.entries()));
+    console.error("Request headers:", Object.fromEntries(headers.entries())); // changed to error
 
     // Make the proxied request
     const response = await fetch(targetUrl, {
@@ -59,13 +59,16 @@ export default async function handler(req, res) {
       headers,
       body: req.method !== "GET" ? JSON.stringify(req.body) : undefined,
     });
-    console.warn("Response status:", response.status);
+    console.error("Response status:", response.status); // changed to error
 
-    // If the response code is anything other than a 200, check if there is a response body before parsing it. 
-    // content-length is not reliable using this proxy, so we only check it when the requests errors.
+    // Always log the raw response body for debugging
+    const text = await response.text();
+    console.error("Raw response body:", text); // changed to error
+
+    // If the response code is anything other than a 200, check if there is a response body before parsing it.
     if (response.status !== 200) {
       const contentLength = response.headers.get("content-length");
-      console.warn("Non-200 response, content-length:", contentLength);
+      console.error("Non-200 response, content-length:", contentLength); // changed to error
       if (!contentLength || parseInt(contentLength, 10) === 0) {
         // If there is no content in a non-200 response, return this
         return res.status(response.status).json({ error: "No content returned" });
@@ -73,18 +76,16 @@ export default async function handler(req, res) {
     }
 
     // Parse response body and return it to the caller
-    const text = await response.text();
-    console.warn("Raw response body:", text);
     let data;
     try {
       data = JSON.parse(text);
     } catch (jsonErr) {
-      console.error("JSON parse error:", jsonErr);
+      console.error("JSON parse error:", jsonErr); // changed to error
+      console.error("Upstream returned non-JSON body:", text); // extra context
       return res.status(500).json({ error: "Invalid JSON from upstream", raw: text });
     }
     return res.status(response.status).json(data);
   } catch (error) {
-    
     console.error("Error forwarding request:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
